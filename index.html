@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#10121c">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="咒术转盘">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
@@ -57,7 +57,10 @@ body {
   position: relative; z-index: 1; max-width: 480px; margin: 0 auto;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 14px 32px;
+  /* room for the phone's status bar and home bar when the page runs full screen (the home-screen app): without it the title
+     and the 人物 / 重生 / 设置 buttons sit under the clock and cannot be scrolled out */
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
   display: flex; flex-direction: column; gap: 14px;
 }
 header { display: flex; align-items: center; justify-content: space-between; gap: 8px 10px; flex-wrap: wrap; }
@@ -13713,5 +13716,6 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
 })();
 </script>
 
-<script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));</script>
+<script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+{ const p = document.getElementById("musicPanel"); if (p) { const v = document.createElement("div"); v.className = "now"; v.textContent = "版本 0.0.2"; p.appendChild(v); } }</script>
 </html>
