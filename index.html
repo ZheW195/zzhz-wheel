@@ -6397,7 +6397,8 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
     c.pick = (S, o) => { const r = pk(S, o) || []; return r.concat(S.world.getoGood && !S.world.getoReport ? [D("geto.report")] : []); };
     return c;
   });
-  NODES["geto.report"] = S => (!S.world.getoGood || S.world.getoReport || !storyAvailable(S, "夏油杰") ? { skip: true } : {
+  // (the one beside him in these three wheels is on 高专's side: he stayed at 高专, and the other side is still the other side)
+  NODES["geto.report"] = S => (!S.world.getoGood || S.world.getoReport || !storyAvailable(S, "夏油杰") || sideOf(S) !== "hero" ? { skip: true } : {
     title: "夏油留下之后·被删改的任务报告", hint: "一份报告写着无人存活，另一份上还有证人的名字。揭露问题也会暴露证人。",
     opts: [
       O("复制报告，申请公开复核", { w: 2, route: "public", d: "留下公开证据，随后必须保护证人。" }),
@@ -7546,6 +7547,13 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
 
   const fate2018 = (S, id) => (yearOf(S) >= 2070 && S.world.fates2018 && S.world.fates2018[id] ? S.world.fates2018[id] : fateOf(S, id));
 
+  // 夏油 and 盘星教. Until the summer of 2007 夏油杰 is 高专's: one of the two students who stood between the congregation
+  // and the star plasma vessel. He and 盘星教 are enemies. He becomes its head only by walking in that summer and taking it,
+  // and then only for the believers who knelt (path "geto"). Before that day, in a world where he never left 高专
+  // (getoGood), and for those who walked out with the old creed (path "old"; `walked` once the new creed has given them another path), he is the other side: nothing puts such a
+  // believer at his shoulder — no wheel beside him, no teacher, no bond (chapters/faction-cult.js, systems/bonds.js)
+  function cultAgainstGeto(S) { const f = facOf(S); return !!f && !f.left && f.id === "cult" && f.path !== "geto" && (!f.path || f.path === "old" || !!f.walked || !!S.world.getoGood); }
+
   // R7: in 新宿's year a few lives of the other side stand with 高专 — without changing stance or leaving their faction
   function finalSide(S) {
     const side = S.stance ? S.stance.side : "hero", f = facOf(S), y = S.year || 2018;
@@ -8340,7 +8348,8 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
   const sworeItYourself = S => isCurse(S) || !!S.world.reincarnated || !!(S.identity && S.identity.v === "受肉体") || !!(S.era && !S.era.after && S.era.start <= 2);
   // someone you trust who could come along (named, still around, fit to fight)
   const oathAlly = S => relList(S).filter(([n, v]) => v >= 1 && n !== OATH_HEIR && characterId(n) && allyAlive(S, n)).sort((a, b) => b[1] - a[1]).map(x => x[0])[0] || null;
-  const homeSide = S => (sideIs(S, "hero") ? "总监部" : S.stance && S.stance.sub === "sukuna" ? "里梅" : S.stance && S.stance.sub === "geto" ? "家人" : S.stance && S.stance.sub === "merc" ? "中间人" : S.stance && S.stance.sub === "cult" ? "教团的人" : "羂索的人");
+  // (your own side, by its name: with 里梅 gone, 宿傩's side is whoever still follows him — she is not named after her death)
+  const homeSide = S => (sideIs(S, "hero") ? "总监部" : S.stance && S.stance.sub === "sukuna" ? (isAround(S, "uraume") ? "里梅" : "追随诅咒之王的人") : S.stance && S.stance.sub === "geto" ? "家人" : S.stance && S.stance.sub === "merc" ? "中间人" : S.stance && S.stance.sub === "cult" ? "教团的人" : "羂索的人");
 
   registerChapter({
     id: "oath", name: "古代誓约",
@@ -11540,13 +11549,15 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
   const CULT_PATH = { geto: "跟着夏油的教团", old: "守着旧教义", merge: "信了新教义", use: "看穿了新教义，留下来利用它", pure: "看穿了新教义，站出来反对它" };
 
   // ---------- getting in ----------
+  // (the row on the wheel says whose the congregation is that year: 高专's enemy in 2006, 夏油's from 2007 to his death)
+  const cultRowNote = S => (S.year < 2007 ? "悬赏星浆体的就是他们；高专派去护卫的五条悟和夏油杰，是他们的对头。" : S.year < 2018 ? "十年前，叛逃的夏油杰夺下了它，如今教团听他的。" : "");
   aroundNode("stance", "chapters/faction-cult", (next, S) => {
     const def = next(S);
-    return Object.assign({}, def, { pick: (S, o) => {
+    return Object.assign({}, def, { opts: def.opts.map(o => (o.sub === "cult" ? Object.assign({}, o, { d: o.d + cultRowNote(S) }) : o)), pick: (S, o) => {
       const go = def.pick(S, o) || [], f = cultFac(S);
       if (!f || o.sub !== "cult") return go;
       if (S.year < 2007) { add(S, "盘星教，正式的名字叫「时之器会」。信徒相信天元大人维系着这个世界，容不得祂沾上一点不洁。{n}是信徒里少数看得见咒灵的人。"); return go; }
-      if (S.year < 2018) { f.path = "geto"; f.rank = 1; add(S, "十年前，一个叫夏油杰的男人走进集会，杀了代表，教团从此姓了夏油。{n}那天跪下了，一直跪到现在。"); return go; }
+      if (S.year < 2018) { f.path = "geto"; f.rank = 1; add(S, "十年前，一个叫夏油杰的男人走进集会，杀了代表，教团从此姓了夏油。在那之前，他是高专的术师，是教团的对头。{n}那天跪下了，一直跪到现在。"); return go; }
       f.cause = 30; f.rank = 1;
       add(S, kenjakuBody(S) === "geto" ? "夏油杰死在了去年的平安夜。教团群龙无首，直到有一天，「夏油」又回来了。" : "夏油杰死在了去年的平安夜。教团群龙无首，直到有一天，一个额头带缝合线的僧人走进了道场。");
       startChapter(S, "facCult", "creed");
@@ -11568,7 +11579,41 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
     const def = next(S), f = cultFac(S);
     if (!f) return def;
     const say = { "接下悬赏": "经手教团的悬赏，亲自去截杀星浆体。", "和甚尔联手": "教团的三千万，是你送到术师杀手手上的。", "旁观": "教团里的事，你只是看着。" }, gain = { "接下悬赏": 8, "和甚尔联手": 10, "旁观": 0 };
-    return Object.assign({}, def, { opts: def.opts.map(o => Object.assign({}, o, { d: say[o.v] || o.d })), pick: (S, o) => { applyFx(S, gain[o.v] ? { cause: gain[o.v] } : { doubt: 1 }); return def.pick(S, o); } });
+    // (who is on the other side that year: the two students 高专 sent — one of them is 夏油杰)
+    return Object.assign({}, def, { opts: def.opts.map(o => Object.assign({}, o, { d: say[o.v] || o.d })), pick: (S, o) => { applyFx(S, gain[o.v] ? { cause: gain[o.v] } : { doubt: 1 }); add(S, "那一年挡在教团和星浆体之间的，是高专派来的两个学生：五条悟，夏油杰。"); return def.pick(S, o); } });
+  });
+
+  // ---------- 玉折: 夏油 is still 高专's that summer, and the congregation's enemy (state/world.js cultAgainstGeto) ----------
+  // a believer does not go to the village at his side; and if he stays at 高专, it was not a believer who talked him round
+  aroundNode("gyo.village", "chapters/faction-cult", (next, S) => {
+    const def = next(S);
+    return cultFac(S) && def.opts ? Object.assign({}, def, { opts: def.opts.filter(o => o.v !== "和夏油一起去了") }) : def;
+  });
+  aroundNode("kai.geto", "chapters/faction-cult", (next, S) => {
+    const def = next(S);
+    if (!cultFac(S) || !def.pick) return def;
+    return Object.assign({}, def, { hint: "夏油不叛逃的话，他就一直是高专的术师，教团也不会换主人。",
+      opts: def.opts.map(o => (o.v === "留了下来" ? Object.assign({}, o, { d: "夏油留在了高专，照旧站在教团的对面。百鬼夜行不会发生，教团也还是老样子。" }) : o)),
+      pick: (S, o) => {
+        const k = S.story.length, go = def.pick(S, o), e = S.story[k];
+        if (o.v === "留了下来" && e && /夏油/.test(e.t)) e.t = S.world.twinsSaved
+          ? "那个夏天之后，夏油杰没有走。笼子是空的，他没有找到该恨的人。把孩子带走的是谁，他一直没有查到——那是时之器会的信徒，是他的对头。"
+          : "那个夏天之后，夏油杰没有离开高专。消息传到道场的时候，没有人当回事：去年挡在教团和星浆体之间的那个高专术师，还站在原来的地方。";
+        return go;
+      } });
+  });
+  // 2007–2017, for the believers who are not his (they walked out with the old creed): he is nobody's teacher among them,
+  // the 帐 over the shopping street is his people's, and the night of 百鬼夜行 is not their march (below, hyakki.vrole)
+  // (the two teacher wheels are still wrapped the old way elsewhere: a layer on nodeDef, not on the node)
+  around("nodeDef", "chapters/faction-cult#teacher", (next, S, n) => {
+    const d = next(S, n);
+    if (!d || (n.k !== "lude.master" && n.k !== "mentor") || !d.opts || !cultAgainstGeto(S) || !d.opts.some(o => o.v === "夏油杰")) return d;
+    return Object.assign({}, d, { opts: d.opts.filter(o => o.v !== "夏油杰") });
+  });
+  aroundChoice("trap.role", "chapters/faction-cult", (next, S) => {
+    const c = next(S);
+    if (!cultAgainstGeto(S) || S.world.getoGood) return c;
+    return Object.assign({}, c, { opts: c.opts.filter(o => o.v !== "替夏油杰守着帐").map(o => (o.v === "去找落帐的人" ? Object.assign({}, o, { w: 2, d: "撑帐的是夏油的人。旧信徒和他们，有一笔十年的旧账。" }) : o)) });
   });
 
   // ---------- between events, once the new creed is preached ----------
@@ -11630,9 +11675,13 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
   aroundChoice("hyakki.vrole", "chapters/faction-cult", (next, S) => {
     const c = next(S), f = cultFac(S);
     if (!f || !f.path) return c;
-    return Object.assign({}, c, { opts: c.opts.concat([f.path === "geto"
-      ? O("守着道场里的信徒", { w: 2.5, d: "教主带人去了高专和新宿。道场里只剩信徒，总得有人看着。大业 +。", s: "百鬼夜行那一夜，{n}留在道场里。信徒们跪了一整夜，等教主回来。他没有回来。", fx: { cause: 5 } })
-      : O("回道场看一眼", { w: 2, d: "夏油带着人去了东京和京都。道场空了。动摇 +1。", s: "百鬼夜行那一夜，{n}回到了十年没踏进过的道场。门开着，里面一个人也没有，供桌上的香还在烧。", fx: { doubt: 1, cause: 3 } })]) });
+    if (f.path === "geto") return Object.assign({}, c, { opts: c.opts.concat([
+      O("守着道场里的信徒", { w: 2.5, d: "教主带人去了高专和新宿。道场里只剩信徒，总得有人看着。大业 +。", s: "百鬼夜行那一夜，{n}留在道场里。信徒们跪了一整夜，等教主回来。他没有回来。", fx: { cause: 5 } })]) });
+    // the old believers never were his: the march on 高专, 新宿 and 京都 is not theirs (the wheel's own three posts are left out)
+    return Object.assign({}, c, { title: "百鬼夜行·旧信徒的这一夜", opts: [
+      O("回道场看一眼", { w: 2, d: "夏油带着人去了东京和京都。道场空了。动摇 +1。", s: "百鬼夜行那一夜，{n}回到了十年没踏进过的道场。门开着，里面一个人也没有，供桌上的香还在烧。", fx: { doubt: 1, cause: 3 } }),
+      O("给旧信徒守夜", { w: 2, d: "外面到处是放出来的咒灵。旧信徒看不见，你看得见。大业 +。", s: "百鬼夜行那一夜，{n}把还有来往的旧信徒聚到一处，守到了天亮。外面是什么在叫，屋里只有{n}一个人听得见。", fx: { cause: 4 } }),
+    ] });
   });
   aroundChoice("junpei.v", "chapters/faction-cult", (next, S) => {
     const c = next(S), f = cultFac(S);
@@ -11702,11 +11751,11 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
         ].filter(Boolean) };
       }),
       takeover: cultStep((S, f) => {
-        if (S.world.getoGood) return { title: "玉折·教团照旧", hint: "那个夏天之后，教团里什么也没有变。", then: () => { f.path = "old"; return { wait: "c1" }; }, opts: [
+        if (S.world.getoGood) return { title: "玉折·教团照旧", hint: "那个夏天之后，教团里什么也没有变。去年坏了教团大事的夏油杰还留在高专，照旧站在教团的对面。", then: () => { f.path = "old"; return { wait: "c1" }; }, opts: [
           O("继续念经", { w: 2, d: "大业 +。", s: "{n}照旧每天去道场。香火钱一年比一年多。", fx: { cause: 5 } }),
           O("往上走一步", { w: 1 + st(S, "iq") * 0.2, d: "地位 +1。", s: "老代表开始把一些不方便出面的事交给{n}办。", fx: { rank: 1, cause: 3 } }),
         ] };
-        return { title: "玉折·教团换了主人", hint: "2007 年，一个穿袈裟的年轻人走进集会，当着所有信徒的面杀了代表：「从今天起，这里归我。」", then: (S, o) => { if (o.leave) { applyFx(S, { stance: "自由人", leave: true }); return null; } f.path = o.path; return { wait: "c1" }; }, opts: [
+        return { title: "玉折·教团换了主人", hint: "2007 年，一个穿袈裟的年轻人走进集会，当着所有信徒的面杀了代表：「从今天起，这里归我。」有信徒认出了他：去年挡在教团和星浆体之间的高专学生，夏油杰。", then: (S, o) => { if (o.leave) { applyFx(S, { stance: "自由人", leave: true }); return null; } f.path = o.path; return { wait: "c1" }; }, opts: [
           O("跪下", { w: 2.5, path: "geto", d: "教团归了夏油，你也是。大业 +，地位 +1。", s: "{n}跪下了。那个人看了{n}一眼：「你看得见，是吧。那你不是猴子。留下。」", fx: { cause: 6, rank: 1 } }),
           O("带着旧信徒出走", { w: 0.6 + st(S, "moral") * 0.15, path: "old", d: "守着旧教义转入地下。地位 +1，大业 −。", s: "当晚，{n}带着十几户不肯改口的老信徒离开了道场。「时之器会」的牌子，{n}揣在怀里带走了。", fx: { rank: 1, cause: -5 } }),
           O("趁乱逃走", { w: 0.8, leave: true, d: "教团到此为止。你成了自由人。", s: "{n}趁着大厅里的混乱，从侧门走了，再也没有回去。" }),
@@ -11749,7 +11798,7 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
         const gone = isDead(S, "kenjaku"), real = kenjakuBody(S) !== "geto", out = f.path === "old" && !S.world.getoGood;
         const came = gone ? "额头带缝合线的那个人已经死在了涩谷，可他留在教团里的人还在讲他的那一套" : out ? `${real ? "一个额头带缝合线的僧人" : "顶着夏油的脸的那个人"}派人找到了旧信徒的住处` : real ? "一个额头带缝合线的僧人走上了讲坛" : "死去的教主回来了，额头上多了一道缝合线";
         return { title: "新的教义", hint: `${came}。${gone ? "他们" : out ? "来的人" : real ? "那个僧人" : "「夏油」"}说：天元大人不该只是被供着。所有人，都该成为祂的一部分。${gone ? "讲它的人，已经不在了。" : ""}`,
-          then: (S, o) => { if (o.leave) { applyFx(S, { stance: "自由人", leave: true }); return null; } f.path = o.path; return { wait: "verdict" }; }, opts: [
+          then: (S, o) => { if (o.leave) { applyFx(S, { stance: "自由人", leave: true }); return null; } if (f.path === "old") f.walked = true; f.path = o.path; return { wait: "verdict" }; }, opts: [   // walked: once of the old creed, never 夏油's (cultAgainstGeto)
           O("信了", { w: 2 + (f.path === "old" ? -1 : 0), path: "merge", d: "大业 +。", s: gone ? "{n}听完，哭了。讲它的人不在了，{n}还是信。" : "{n}听完，哭了。原来这么多年的经，念的就是这一天。", fx: { cause: 10 } }),
           O("看穿了，留下来", { w: 0.6 + st(S, "iq") * 0.3, path: "use", d: "他要的不是天元，是别的东西。但这个教团，你用得上。", s: out ? "{n}听出来了：这些人嘴里的「天元」，和旧信徒拜的不是同一个。{n}没有说破，收下了他们留下的经文。" : "{n}听出来了：这个人嘴里的「天元」，和教团拜的不是同一个。{n}没有说破，带头鼓了掌。", fx: { cause: 4, rank: 1, world: { knowKenjaku: true } } }),
           O("看穿了，站出来反对", { w: 0.4 + st(S, "moral") * 0.2 + (f.path === "old" ? 1.5 : 0), path: "pure", d: "旧教义说，天元容不得玷污。把所有人塞给祂，就是最大的玷污。",
@@ -12801,7 +12850,7 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
     inumaki: { sides: ["hero"], signature: "cover", line: "狗卷用最短的一句咒言拖住对手，随即退到你能照应到的位置。", detail: "对手下一招威力降至65%" },
     okkotsu: { sides: ["hero"], signature: "heal", line: "乙骨先确认了你的呼吸，把正能量送进伤处，才回头看向战场。", detail: "恢复15点生命，不超过上限" },
     tsukumo: { sides: ["hero"], signature: "weakness", line: "九十九笑着挡开碎石，把对手真正重心所在的位置告诉了你。", detail: "你的下一击威力+15%" },
-    geto: { sides: ["hero", "villain"], when: S => sideIs(S, "hero") ? yearOf(S) < 2007 || !!S.world.getoGood : yearOf(S) >= 2007 && !S.world.getoGood, signature: "cover", line: "一只熟悉的咒灵从上方掠过，夏油让它拖住了追上来的敌人。", detail: "对手下一招威力降至65%" },
+    geto: { sides: ["hero", "villain"], when: S => sideIs(S, "hero") ? yearOf(S) < 2007 || !!S.world.getoGood : yearOf(S) >= 2007 && !S.world.getoGood && !cultAgainstGeto(S), signature: "cover", line: "一只熟悉的咒灵从上方掠过，夏油让它拖住了追上来的敌人。", detail: "对手下一招威力降至65%" },
     toji: { sides: ["hero", "villain"], when: S => !!S.world.tojiAlive && !!S.world.tojiAlly, signature: "weakness", line: "甚尔没有解释怎么找来的。他踢开路上的障碍，只说了一句：还没死就跟上。", detail: "你的下一击威力+15%" },
     junpei: { sides: ["hero"], when: S => !!S.world.junpei && S.world.junpeiRole === "scout", remote: true, signature: "aim", line: "顺平的声音从耳机里传来。他始终留在安全距离，只把自己核实过的动向报给你。", detail: "远程侦察：下一次进攻命中+15个百分点" },
     kenjaku: { sides: ["villain"], signature: "aim", line: "羂索没有走近，只把对手的一个习惯交代得异常清楚。你知道他另有所图，但情报暂时是真的。", detail: "下一次进攻命中+15个百分点" },
@@ -17312,12 +17361,13 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
   ["shonen", "junpei", "goodwill", "yasohachi"].forEach(e => aroundEvent(e, "story/people#geto", (next, S) => (stitchAsks(S) ? [D("geto.stitch")] : []).concat(next(S))));
   NODES["geto.stitch"] = S => {
     if (!stitchAsks(S)) return { skip: true };
+    const far = cultAgainstGeto(S);   // a believer of 盘星教 is on the other side from him (state/world.js): the warning goes by post, unsigned
     return { title: "2018·有人来打听咒灵操术", hint: "一个额头带缝合线的人托了好几层关系，问的都是同一件事：夏油杰的咒灵操术，能装下多少只。", opts: [
-      O("设防", { w: 1 + st(S, "iq") * 0.25, wary: true, d: "夏油换了住处，身边多了人。" }),
+      O("设防", { w: 1 + st(S, "iq") * 0.25, wary: true, d: far ? "把信匿名寄给高专。夏油换了住处，身边多了人。" : "夏油换了住处，身边多了人。" }),
       O("没当回事", { w: 1.5, d: "夏油笑了笑：「想要的人多了。」" }),
     ], pick: (S, o) => {
       S.world.getoWary = !!o.wary;
-      add(S, o.wary ? "{n}把那几封打听消息的信摊在夏油面前。夏油看了很久，那一周就换了住处，身边一直跟着人。" : "夏油没把这件事当回事：「想要我术式的人，这些年从来没少过。」");
+      add(S, o.wary ? (far ? "{n}把那几封打听消息的信装进一个没有署名的信封，寄到了高专。夏油看了很久，那一周就换了住处，身边一直跟着人。寄信的人是谁，他没有查到。" : "{n}把那几封打听消息的信摊在夏油面前。夏油看了很久，那一周就换了住处，身边一直跟着人。") : "夏油没把这件事当回事：「想要我术式的人，这些年从来没少过。」");
       return [];
     } };
   };
@@ -19242,7 +19292,7 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
   // the big result above the wheel: "？" while nothing has landed; a result arrives with a sheen, a rare one glows
   function showBig(t, rare) {
     const el = $("bigRes"), idle = t === "？";
-    el.textContent = t; el.classList.toggle("idle", idle); el.classList.toggle("rare", !!rare && !idle);
+    keepWheel(() => { el.textContent = t; el.classList.toggle("idle", idle); el.classList.toggle("rare", !!rare && !idle); });   // a long result takes a second line
     el.classList.remove("reveal"); if (!idle) { void el.offsetWidth; el.classList.add("reveal"); }
   }
   function renderLegend(opts, weights, hit) {
@@ -19257,7 +19307,9 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
   let curColorFn = null, legendOpen = false;
 
   // ---------- flow ----------
-  function advance() {
+  // each of these changes what is above the wheel (the title, the big result, the battle panel): the wheel is held in place
+  function advance() { keepWheel(advanceNow); }
+  function advanceNow() {
     clearTimeout(autoTimer);
     S.res = null; S.snap = null; S.view = null;
     $("slip").hidden = true; showBig("？");
@@ -19278,7 +19330,8 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
     if (prefs.auto && def && !S.done) { const cur = S.cur; autoTimer = setTimeout(() => { if (!prefs.auto || S.cur !== cur) return; if (def.panel) next(); else if (canSpin()) spin(); }, def.panel ? (prefs.fast ? 1200 : 2500) : 500); }
   }
    const inFight = () => !!S.B;
-  function setup() {
+  function setup() { keepWheel(setupNow); }
+  function setupNow() {
     cheatArmed = false;
     const def = curDef();
     curColorFn = null;
@@ -19393,7 +19446,8 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
     if (inFight()) return !S.B.over && actorOf(S.B) === "me";
     return S.res === null;
   }
-  function renderButtons() {
+  function renderButtons() { keepWheel(renderButtonsNow); }   // the name row is above the wheel
+  function renderButtonsNow() {
     const def = curDef(), mb = $("mainBtn");
     let label = "转动", fight = false, wait = false;
     if (S.done) label = "再来一生";
@@ -19475,15 +19529,40 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
   }
   // "away": the panel's stamina rows have mostly gone up under the pinned bar — less than 40px of them still showing (60px to
   // come back, so the bar does not flicker at the edge); measured on scroll, once a frame
+  function watchPanel() {
+    const away = !$("battle").hidden && $("bVitals").getBoundingClientRect().bottom < $("hud").getBoundingClientRect().bottom + (panelAway ? 60 : 40);
+    if (away !== panelAway) { panelAway = away; renderHudFight(); }
+  }
   let hudTick = false;
   addEventListener("scroll", () => {
     if (hudTick) return; hudTick = true;
-    requestAnimationFrame(() => {
-      hudTick = false;
-      const away = !$("battle").hidden && $("bVitals").getBoundingClientRect().bottom < $("hud").getBoundingClientRect().bottom + (panelAway ? 60 : 40);
-      if (away !== panelAway) { panelAway = away; renderHudFight(); }
-    });
+    requestAnimationFrame(() => { hudTick = false; watchPanel(); });
   }, { passive: true });
+  // ---------- the wheel stays where it is on screen ----------
+  // What sits above the wheel changes height all the time: the battle panel appears when a fight starts and goes when it ends,
+  // its log grows, a long result or title wraps onto a second line, the pinned bar gains a row. Each of those pushed the wheel
+  // down or pulled it up under the player's thumb — at the start of a fight by a whole panel, which left the screen showing the
+  // top of the page. keepWheel(fn) measures where the wheel's centre button is on screen, runs fn, and scrolls the page by
+  // however far the button moved, so the wheel is the fixed point. It measures on screen (not in the document), inside one
+  // turn of the event loop, so it is right whether or not the browser does its own scroll anchoring. Calls nest: only the
+  // outermost one measures. Nothing is done when the wheel is below the screen (the player is looking at what is above it)
+  // or not shown at all (the ending).
+  let wheelHeld = 0, wheelSlip = 0;   // wheelSlip: the part of a pixel the last correction could not make (pages scroll by whole pixels), carried into the next one so the wheel does not creep
+  function keepWheel(fn) {
+    if (wheelHeld) return fn();
+    const hub = $("hub"), shown = () => hub.getClientRects().length > 0, at = () => hub.getBoundingClientRect().top;
+    const want = shown() && at() < innerHeight ? at() - wheelSlip : null;   // where the wheel should still be afterwards
+    const settle = () => {
+      if (want === null || !shown()) return;
+      const step = Math.round(at() - want); if (step) scrollBy(0, step);
+      wheelSlip = at() - want; if (Math.abs(wheelSlip) > 1) wheelSlip = 0;   // the page was at its top or bottom and could not go that far: let it be
+    };
+    wheelHeld++;
+    try { return fn(); }
+    // the scroll may have taken the battle panel out from under the pinned bar (or back): the bar's extra row is decided now,
+    // not a frame later, and what that row adds to the bar's height is taken up too
+    finally { wheelHeld--; settle(); watchPanel(); settle(); }
+  }
   // ---------- battle panel: who against whom, each side's stamina and energy, how the exchange stands, whose move it is ----------
   const TURN_LABEL = { me: "你", opp: "敌", ally: "友", summon: "召", mysummon: "召" }, TURN_TEAM = { me: "me", opp: "opp", ally: "ally", summon: "opp", mysummon: "me" };
   let vitKey = "";
@@ -19586,7 +19665,8 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
     el.innerHTML = `<b>${esc(who)}</b><span>${esc(o.n)}</span><em>${pts > 0 ? pts + " 分" : o.type === "guard" ? "防御" : o.type === "flaw" ? "破绽" : o.type === "breathe" ? "调息" : o.type === "form" ? "形态" : "落空"}</em>`;
     el.className = "banner " + (o.type || "tech"); el.hidden = false; void el.offsetWidth; el.classList.add("play");
   }
-  function battleMoveFx(B, actor, o, r, before) {
+  function battleMoveFx(B, actor, o, r, before) { keepWheel(() => battleMoveFxNow(B, actor, o, r, before)); }   // the move banner and the stamina rows are above the wheel
+  function battleMoveFxNow(B, actor, o, r, before) {
     renderVitals(B);   // the rows must exist (and show the new numbers) before anything lifts off them
     const now = battleReading(B), who = actor === "me" ? S.name : actor === "ally" ? B.ally.n : actor === "summon" ? B.summon.n : actor === "mysummon" ? B.mySummon.n : foeName(B);
     let mine = 0, any = false;
@@ -19650,7 +19730,7 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
       document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") cloudPull(false); });
     } catch (e) {}
   })();
-  function renderAll() { renderHud(); renderSheet(); renderBattle(); renderStory(); renderButtons(); saveGame(); }
+  function renderAll() { keepWheel(() => { renderHud(); renderSheet(); renderBattle(); renderStory(); renderButtons(); }); saveGame(); }
   addEventListener("pagehide", saveGame);
 
   function showSlip(k, v, tag, d, win) {
@@ -20173,5 +20253,5 @@ details.hsec summary { cursor: pointer; font-family: var(--display); font-size: 
 </script>
 
 <script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
-{ const p = document.getElementById("musicPanel"); if (p) { const v = document.createElement("div"); v.className = "now"; v.textContent = "版本 0.0.3"; p.appendChild(v); } }</script>
+{ const p = document.getElementById("musicPanel"); if (p) { const v = document.createElement("div"); v.className = "now"; v.textContent = "版本 0.0.4"; p.appendChild(v); } }</script>
 </html>
