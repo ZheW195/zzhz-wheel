@@ -1,5 +1,5 @@
-// 咒术转盘 · offline cache, version b2a1bdc2d546 (a new build is a new version: the old cache is dropped)
-const CACHE = "zs-b2a1bdc2d546";
+// 咒术转盘 · offline cache, version ce65a6cfcf2d (a new build is a new version: the old cache is dropped)
+const CACHE = "zs-ce65a6cfcf2d";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener("activate", e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
